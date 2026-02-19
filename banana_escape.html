@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Banana Escape — Save Me, Miss Banana!</title>
+<style>
+  :root{
+    --gold:#ffd66b;
+    --gold-deep:#f4b400;
+    --bg-start:#081229;
+    --bg-end:#06361f;
+    --glass: rgba(255,255,255,0.06);
+    --ui-shadow: 0 6px 24px rgba(0,0,0,0.45);
+    --romantic: #ff7fbf;
+  }
+  html,body{height:100%;margin:0;font-family:Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;}
+  body{background:linear-gradient(180deg,var(--bg-start),#0b2a21 35%, var(--bg-end)); color:white; overflow:hidden; -webkit-touch-callout:none; -webkit-user-select:none; -ms-user-select:none; user-select:none;}
+  canvas{display:block; width:100vw; height:100vh;}
+  /* cinematic intro overlay */
+  .overlay{
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:30;
+    background:linear-gradient(180deg, rgba(2,6,23,0.6), rgba(3,12,6,0.65));
+    backdrop-filter: blur(4px) saturate(120%);
+    padding:20px;
+  }
+  .card{
+    width: min(920px, 95vw);
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border-radius:18px;
+    box-shadow: 0 12px 40px rgba(2,6,23,0.7), inset 0 1px 0 rgba(255,255,255,0.02);
+    padding:28px;
+    text-align:center;
+    color: #fff;
+    position:relative;
+    overflow:hidden;
+  }
+  .dreamy{
+    font-size:20px; line-height:1.45; color:var(--gold);
+    text-shadow: 0 6px 22px rgba(246,200,84,0.12), 0 2px 6px rgba(0,0,0,0.6);
+    font-weight:600;
+    white-space:pre-wrap;
+    margin-bottom:18px;
+  }
+  .subtitle{
+    color:#cfe6d6; font-weight:500; margin-bottom:22px;
+  }
+  .btns{display:flex; gap:12px; justify-content:center; flex-wrap:wrap;}
+  .btn{
+    background: linear-gradient(180deg,var(--gold),var(--gold-deep));
+    color:#2a1a00;
+    padding:12px 18px; border-radius:12px; cursor:pointer; font-weight:700; box-shadow: 0 8px 30px rgba(245,189,87,0.15); border:0;
+    transform-origin:center; transition: transform .12s ease;
+  }
+  .btn:active{ transform: translateY(2px) scale(.995); }
+  .btn.secondary{
+    background:transparent; color:var(--gold); border:1px solid rgba(255,214,115,0.18);
+    box-shadow:none; font-weight:600;
+  }
+  .small{
+    font-size:12px; opacity:0.9; color: #efe7d7;
+  }
+  .uploader{ display:inline-block; margin-top:6px;}
+  #uploaderInput{ display:none; }
+  /* HUD */
+  .hud{
+    position:fixed; top:18px; left:50%; transform:translateX(-50%); z-index:20; display:flex; gap:16px; align-items:center;
+    background:linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    padding:10px 16px; border-radius:26px; box-shadow: var(--ui-shadow);
+    border:1px solid rgba(255,214,115,0.06);
+  }
+  .hud .pill{ display:flex; gap:8px; align-items:center; color:var(--gold); font-weight:700; padding:6px 10px; border-radius:18px; font-size:15px;}
+  .hud .pill.secondary{ color:#dcefe0; font-weight:700; background:linear-gradient(90deg, rgba(0,0,0,0.12), rgba(255,255,255,0.01));}
+  .bottom-credit{ position:fixed; left:50%; transform:translateX(-50%); bottom:10px; color:#f8edd6; font-size:13px; opacity:0.95; z-index:40; text-shadow:0 2px 10px rgba(0,0,0,0.5);}
+  /* end screens */
+  .end-screen{
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:40; background:linear-gradient(180deg, rgba(1,4,12,0.6), rgba(2,7,9,0.55));
+    color:var(--gold); font-weight:800; text-align:center; padding:24px;
+  }
+  .big-msg{ font-size:clamp(28px,6vw,56px); letter-spacing:0.6px; text-shadow: 0 8px 36px rgba(245,189,87,0.22); }
+  .small-msg{ font-size:16px; margin-top:12px; color:#e8f4e9; font-weight:600; }
+  /* hearts */
+  .heart{
+    position:absolute; width:18px; height:18px; transform:translate(-50%,-50%); pointer-events:none; opacity:0.95;
+  }
+  /* responsive */
+  @media (max-width:520px){ .card{ padding:16px; } .dreamy{ font-size:16px; } .hud{ gap:8px; padding:8px 12px; } .bottom-credit{ font-size:12px } }
+</style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div class="hud" id="hud">
+    <div class="pill" id="scorePill">🍌 0</div>
+    <div class="pill secondary" id="timerPill">⏳ 40s</div>
+    <div class="pill secondary" id="goalPill">Goal: 350</div>
+  </div>
+
+  <div class="overlay" id="intro">
+    <div class="card" role="dialog" aria-label="Intro">
+      <div style="display:flex;align-items:center;gap:18px;justify-content:center;flex-direction:column;">
+        <div style="width:84px;height:84px;border-radius:28px;background:linear-gradient(135deg,#ffd66b,#ffb347);box-shadow:0 10px 30px rgba(255,180,60,0.16);display:flex;align-items:center;justify-content:center;font-size:48px;">🍌</div>
+        <div class="dreamy" id="introText">
+Hey Miss Banana,
+you know me very well...
+Right now I’m trapped in the Sleep Monster’s dreamy jail...
+He keeps me asleep forever 😴
+Only YOU can save me!
+Catch bananas & coconuts to give me energy and wake me up!
+But watch out for his bombs 💣
+Collect 350 points before 40 seconds runs out!
+Click to start rescuing me! 🍌🥥
+        </div>
+
+
+        <div class="btns">
+          <button class="btn" id="startBtn">Click to Start Rescuing Me</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="end-screen" id="endScreen" style="display:none;">
+    <div>
+      <div class="big-msg" id="endTitle"></div>
+      <div class="small-msg" id="endSub"></div>
+      <div style="margin-top:16px;">
+        <button class="btn" id="replayBtn">Play Again</button>
+        <button class="btn secondary" id="backIntro">Back to Intro</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-credit">Catcher art by Miss Banana 🌹</div>
+
+<script>
+/* Banana Escape — Single file game
+   Controls: touch/mouse drag or A/D keys.
+   Upload a catcher image via the intro uploader; otherwise a default hands catcher will be drawn.
+*/
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d', { alpha: false });
+
+let W = innerWidth, H = innerHeight;
+function resize(){ W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+addEventListener('resize', resize);
+resize();
+
+/* Game state */
+const STATE = {
+  running: false,
+  timeLeft: 40,
+  score: 0,
+  goal: 350,
+  startedAt: null,
+  lastSpawn: 0,
+  spawnInterval: 1200, // ms (even slower spawn at start)
+  items: [],
+  speedMultiplier: 1,
+  catcher: {
+    x: W/2, y: H - 120, width: 160, height: 90,
+    vx:0
+  },
+  input: { dragging:false, lastX:0, keys:{left:false,right:false} },
+  catcherImage: null,
+  defaultCatcherImage: null
+};
+
+/* visual theme helpers */
+function drawBackground(){
+  // sky-to-jungle gradient + soft glowing layers
+  const g = ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0, '#07112b'); g.addColorStop(0.25, '#18304a'); g.addColorStop(0.6, '#0b3a23'); g.addColorStop(1,'#042017');
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,W,H);
+
+  // soft fog
+  const fg = ctx.createLinearGradient(0,H*0.15,0,H);
+  fg.addColorStop(0, 'rgba(255,230,160,0.02)');
+  fg.addColorStop(1, 'rgba(0,0,0,0.25)');
+  ctx.fillStyle = fg;
+  ctx.fillRect(0,0,W,H);
+
+  // far twinkle stars / sparkles
+  for(let i=0;i<6;i++){
+    const vx = (i*0.17 + (Date.now()/6000)%1) * W % W;
+    ctx.beginPath();
+    ctx.fillStyle = 'rgba(255,236,166,0.06)';
+    ctx.ellipse(vx, 80 + i*30, 60, 16, 0, 0, Math.PI*2);
+    ctx.fill();
+  }
+}
+
+/* Default catcher drawing (stylized purple-sleeved hands) */
+function drawDefaultCatcher(x, y, w, h){
+  ctx.save();
+  ctx.translate(x, y);
+  const sleeveW = w * 0.47;
+  const handR = Math.min(h*0.36, 36);
+  // sleeves (purple)
+  ctx.fillStyle = '#6a1b9a';
+  roundRect(ctx, -w/2, -h/2 + 12, sleeveW, h*0.62, 14); ctx.fill();
+  roundRect(ctx, -w/2 + sleeveW + 10, -h/2 + 12, sleeveW, h*0.62, 14); ctx.fill();
+  // cuffs
+  ctx.fillStyle = '#eecbff';
+  ctx.fillRect(-w/2 + 8, -h/2 + 12 + (h*0.62)-10, sleeveW-14, 8);
+  ctx.fillRect(-w/2 + sleeveW + 18, -h/2 + 12 + (h*0.62)-10, sleeveW-14, 8);
+  // hands (palms)
+  ctx.beginPath();
+  ctx.fillStyle = '#ffd9be';
+  ctx.ellipse(-w/4, -h/2 + 6, handR, handR*0.9, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(w/4, -h/2 + 6, handR, handR*0.9, 0, 0, Math.PI*2); ctx.fill();
+  // fingers hint
+  ctx.strokeStyle = 'rgba(0,0,0,0.06)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(-w/4 - handR*0.2, -h/2 + 6); ctx.lineTo(-w/4 + 6, -h/2 + 6 - handR*0.24); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(w/4 + handR*0.2, -h/2 + 6); ctx.lineTo(w/4 - 6, -h/2 + 6 - handR*0.24); ctx.stroke();
+  ctx.restore();
+}
+
+/* utility */
+function roundRect(c, x, y, w, h, r){
+  c.beginPath();
+  c.moveTo(x+r, y);
+  c.arcTo(x+w, y, x+w, y+h, r);
+  c.arcTo(x+w, y+h, x, y+h, r);
+  c.arcTo(x, y+h, x, y, r);
+  c.arcTo(x, y, x+w, y, r);
+  c.closePath();
+}
+
+/* Items: banana, coconut, bomb */
+// Preload banana and coconut images
+const bananaImg = new Image();
+bananaImg.src = 'Banana.png';
+const coconutImg = new Image();
+coconutImg.src = 'Coconut.png';
+
+function spawnItem(){
+  const isMobile = window.innerWidth < 600;
+  const p = Math.random();
+  // More bombs, fewer coconuts
+  let types;
+  if (p < 0.5) types = 'banana';
+  else if (p < 0.8) types = 'coconut';
+  else types = 'bomb';
+  // Increase item sizes for mobile
+  let size;
+  if (types === 'banana') size = isMobile ? 52 : 36;
+  else if (types === 'coconut') size = isMobile ? 66 : 46;
+  else size = isMobile ? 60 : 40;
+  // Spawn items more toward the center on mobile
+  let x;
+  if (isMobile) {
+    x = 60 + Math.random() * (W - 120);
+  } else {
+    x = 40 + Math.random() * (W - 80);
+  }
+  // Increase falling speed for fruits and bombs
+  const timeFactor = 1 + ((Date.now() - STATE.startedAt) / 1000) / 90;
+  let vy;
+  if (types === 'banana' || types === 'coconut') {
+    vy = (1.2 + Math.random()*0.32) * timeFactor; // Faster than before
+  } else if (types === 'bomb') {
+    vy = (1.5 + Math.random()*0.38) * timeFactor; // Bombs fall even faster
+  }
+  const item = { type: types, x, y:-60, vy, size, rot: Math.random()*Math.PI*2, vr: (Math.random()-0.5)*0.03 };
+  STATE.items.push(item);
+}
+
+/* Draw item icons (handmade emoji-ish shapes) */
+function drawItem(it){
+  ctx.save();
+  ctx.translate(it.x, it.y);
+  ctx.rotate(it.rot);
+  if(it.type==='banana' && bananaImg.complete && bananaImg.naturalWidth){
+    ctx.drawImage(bananaImg, -it.size/2, -it.size/2, it.size, it.size);
+  } else if(it.type==='coconut' && coconutImg.complete && coconutImg.naturalWidth){
+    ctx.drawImage(coconutImg, -it.size/2, -it.size/2, it.size, it.size);
+  } else if(it.type==='bomb'){
+    // bomb
+    ctx.beginPath(); ctx.fillStyle='#222'; ctx.ellipse(0,0, it.size*0.6, it.size*0.6, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.strokeStyle='#ffd66b'; ctx.lineWidth=2; ctx.moveTo(-6,-it.size*0.6+6); ctx.lineTo(6,-it.size*0.6-12); ctx.stroke();
+    ctx.beginPath(); ctx.fillStyle='#ffce3c'; ctx.ellipse(6,-it.size*0.6-12,4,4,0,0,Math.PI*2); ctx.fill();
+  } else {
+    // fallback: original drawing for banana/coconut if image not loaded
+    if(it.type==='banana'){
+      ctx.beginPath();
+      ctx.fillStyle = '#ffd94b';
+      ctx.ellipse(0,0, it.size*0.52, it.size*0.38, -0.35, 0, Math.PI*2);
+      ctx.fill();
+      ctx.beginPath(); ctx.strokeStyle='#c28a14'; ctx.lineWidth=3; ctx.moveTo(-it.size*0.06, -it.size*0.12); ctx.quadraticCurveTo(it.size*0.18, -it.size*0.14, it.size*0.36, -it.size*0.02); ctx.stroke();
+    } else if(it.type==='coconut'){
+      ctx.beginPath(); ctx.fillStyle='#6b3f21'; ctx.ellipse(0,0, it.size*0.55, it.size*0.55, 0, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.fillStyle='#c19055'; ctx.ellipse(-it.size*0.06, -it.size*0.06, it.size*0.28, it.size*0.28, 0, 0, Math.PI*2); ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+/* Collision detection with catcher rectangle */
+function checkCatch(it){
+  const catchW = STATE.catcher.width;
+  const catchH = STATE.catcher.height;
+  const cx = STATE.catcher.x;
+  const cy = STATE.catcher.y;
+  // simple rect-circle intersection
+  const rx = Math.max(cx - catchW/2, Math.min(it.x, cx + catchW/2));
+  const ry = Math.max(cy - catchH/2, Math.min(it.y, cy + catchH/2));
+  const dx = it.x - rx, dy = it.y - ry;
+  return (dx*dx + dy*dy) < (it.size*0.55)*(it.size*0.55);
+}
+
+/* update loop */
+let lastFrame = 0;
+function update(t){
+  if(!STATE.running) { lastFrame = t; requestAnimationFrame(update); return; }
+  const dt = Math.min(60, t - lastFrame) / 1000; lastFrame = t;
+  // time
+  const elapsed = (Date.now() - STATE.startedAt)/1000;
+  STATE.timeLeft = Math.max(0, 40 - elapsed);
+  document.getElementById('timerPill').textContent = '⏳ ' + Math.ceil(STATE.timeLeft) + 's';
+  // speed multiplier ramps gently to make gameplay more intense
+  STATE.speedMultiplier = 1 + Math.min(1.8, elapsed/22);
+  // spawn logic: spawn interval shrinks even more slowly for more challenge
+  const shrink = Math.max(0.7, 1 - elapsed/90); // much slower ramp, min 0.7
+  STATE.spawnInterval = 1200 * shrink; // from 1200 down to ~840ms
+  if(t - STATE.lastSpawn > STATE.spawnInterval){
+    spawnItem();
+    STATE.lastSpawn = t;
+  }
+  // update items
+  for(let i=STATE.items.length-1;i>=0;i--){
+    const it = STATE.items[i];
+    it.vy += 400 * dt * 0.0008 * (1 + STATE.speedMultiplier*0.3); // even slower acceleration
+    it.y += it.vy * dt * 900 * 0.36 * (1 + STATE.speedMultiplier*0.3);
+    it.rot += it.vr * dt * 60;
+    // off bottom -> remove
+    if(it.y - it.size > H + 120){ STATE.items.splice(i,1); continue; }
+    // check catch
+    if(checkCatch(it)){
+      // scoring
+      if(it.type==='banana'){ STATE.score += 20; flashScore('+20', '#fff7d9'); }
+      else if(it.type==='coconut'){ STATE.score += 30; flashScore('+30', '#fff7d9'); }
+      else if(it.type==='bomb'){ STATE.score = Math.max(0, STATE.score - 50); flashScore('-50', '#ffd6d6'); spawnSleepWave(); }
+      STATE.items.splice(i,1);
+      document.getElementById('scorePill').textContent = '🍌 ' + STATE.score;
+    }
+  }
+
+  // input movement (A/D keys)
+  const speed = 1700 * dt * (1 + STATE.speedMultiplier*0.6);
+  if(STATE.input.keys.left) STATE.catcher.x -= speed;
+  if(STATE.input.keys.right) STATE.catcher.x += speed;
+  // clamp
+  STATE.catcher.x = Math.max(60, Math.min(W-60, STATE.catcher.x));
+
+  // pause when time runs out or goal achieved
+  if(STATE.timeLeft <= 0 || STATE.score >= STATE.goal){
+    STATE.running = false;
+    showEnd(STATE.score >= STATE.goal);
+  }
+
+  draw();
+  requestAnimationFrame(update);
+}
+
+/* small floating score pop */
+let pops = [];
+function flashScore(txt, color){
+  pops.push({text:txt, x:STATE.catcher.x + (Math.random()-0.5)*60, y: STATE.catcher.y - 60 + (Math.random()-0.5)*30, alpha:1, color});
+  setTimeout(()=>{ pops.shift(); }, 900);
+}
+
+/* spawn sleepy ripple for bomb */
+let sleepRipples = [];
+function spawnSleepWave(){
+  sleepRipples.push({x: STATE.catcher.x, y: STATE.catcher.y - 30, r:20, a:1});
+  setTimeout(()=> sleepRipples.shift(), 800);
+}
+
+/* draw HUD and game */
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  drawBackground();
+
+  // distant jungle silhouettes
+  ctx.save();
+  ctx.globalAlpha = 0.24;
+  ctx.fillStyle = '#042a1a';
+  ctx.beginPath();
+  ctx.moveTo(0,H*0.72); ctx.quadraticCurveTo(W*0.2,H*0.62,W*0.4,H*0.7);
+  ctx.quadraticCurveTo(W*0.6,H*0.78,W*0.9,H*0.68); ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath(); ctx.fill();
+  ctx.restore();
+
+  // items
+  for(const it of STATE.items) drawItem(it);
+
+  // sleep ripples (bomb effect)
+  for(const r of sleepRipples){
+    ctx.beginPath();
+    ctx.strokeStyle = `rgba(180,200,255,${r.a*0.14})`; ctx.lineWidth = 10;
+    ctx.arc(r.x, r.y, r.r, 0, Math.PI*2); ctx.stroke();
+  }
+
+  // catcher (prefer uploaded, then default image, then fallback art)
+  const cx = STATE.catcher.x;
+  // Use the y set in startGame (moved up for mobile)
+  const cy = STATE.catcher.y;
+  STATE.catcher.y = cy; // update catcher y
+  let img = STATE.catcherImage || STATE.defaultCatcherImage;
+  if(img){
+    const ratio = img.width / img.height;
+    let drawW = STATE.catcher.width * (W/900);
+    let drawH = drawW / ratio;
+    if(drawH > STATE.catcher.height*1.2){ drawH = STATE.catcher.height*1.2; drawW = drawH * ratio; }
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.drawImage(img, -drawW/2, -drawH/2, drawW, drawH);
+    ctx.restore();
+  } else {
+    // fallback catcher art
+    drawDefaultCatcher(cx, cy, STATE.catcher.width, STATE.catcher.height);
+  }
+
+  // floating score pops
+  for(let i=pops.length-1;i>=0;i--){
+    const p = pops[i];
+    p.y -= 0.6; p.alpha -= 0.012;
+    ctx.globalAlpha = Math.max(0, p.alpha);
+    ctx.font = "700 18px Inter";
+    ctx.fillStyle = p.color;
+    ctx.textAlign = 'center';
+    ctx.fillText(p.text, p.x, p.y);
+    ctx.globalAlpha = 1;
+  }
+
+  // hearts when near goal
+  if(STATE.score >= Math.floor(STATE.goal*0.6)){
+    for(let i=0;i<3;i++){
+      const hx = STATE.catcher.x + (i-1)*28;
+      const hy = STATE.catcher.y - 80 - (Math.sin((Date.now()/300)+(i))*6);
+      drawHeart(hx,hy,8 + i*2, (i*0.12)+0.7);
+    }
+  }
+}
+
+/* heart helper */
+function drawHeart(x,y,size,alpha=1){
+  ctx.save(); ctx.globalAlpha = alpha;
+  ctx.translate(x,y); ctx.scale(size/16,size/16);
+  ctx.beginPath(); ctx.fillStyle = 'rgba(255,96,128,0.95)';
+  ctx.moveTo(0,-6); ctx.bezierCurveTo(4,-14,18,-12,18,-2); ctx.bezierCurveTo(18,6,8,12,0,18);
+  ctx.bezierCurveTo(-8,12,-18,6,-18,-2); ctx.bezierCurveTo(-18,-12,-4,-14,0,-6); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+/* input handlers */
+canvas.addEventListener('pointerdown', (e)=>{
+  STATE.input.dragging = true; STATE.input.lastX = e.clientX; canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener('pointermove', (e)=>{
+  if(STATE.input.dragging){
+    const dx = e.clientX - STATE.input.lastX;
+    STATE.catcher.x += dx;
+    STATE.input.lastX = e.clientX;
+  }
+});
+canvas.addEventListener('pointerup', (e)=>{ STATE.input.dragging = false; try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}});
+addEventListener('touchstart', (e)=>{ if(e.touches.length==1){ STATE.input.dragging=true; STATE.input.lastX = e.touches[0].clientX; } }, {passive:true});
+addEventListener('touchmove', (e)=>{ if(STATE.input.dragging && e.touches[0]){ const dx = e.touches[0].clientX - STATE.input.lastX; STATE.catcher.x += dx; STATE.input.lastX = e.touches[0].clientX; } }, {passive:true});
+addEventListener('touchend', ()=>{ STATE.input.dragging=false; });
+
+addEventListener('keydown', (e)=>{
+  if(e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft'){ STATE.input.keys.left = true; }
+  if(e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight'){ STATE.input.keys.right = true; }
+  if(!STATE.running && (e.key===' ' || e.key==='Enter')) startGame();
+});
+addEventListener('keyup', (e)=>{
+  if(e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft'){ STATE.input.keys.left = false; }
+  if(e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight'){ STATE.input.keys.right = false; }
+});
+
+/* Intro controls and uploader */
+const intro = document.getElementById('intro');
+const startBtn = document.getElementById('startBtn');
+
+// Try to load custom catcher image from same folder
+window.addEventListener('DOMContentLoaded', ()=>{
+  const img = new Image();
+  img.onload = ()=> { STATE.defaultCatcherImage = img; };
+  img.onerror = ()=> { STATE.defaultCatcherImage = null; };
+  img.src = 'custom%20catcher.png';
+});
+
+startBtn.addEventListener('click', ()=> startGame());
+
+/* Start game */
+function startGame(){
+  // prepare
+  intro.style.display = 'none';
+  STATE.items.length = 0;
+  STATE.score = 0;
+  STATE.timeLeft = 40;
+  STATE.startedAt = Date.now();
+  STATE.lastSpawn = performance.now();
+  STATE.spawnInterval = 700;
+  STATE.running = true;
+  document.getElementById('scorePill').textContent = '🍌 ' + STATE.score;
+  document.getElementById('timerPill').textContent = '⏳ 40s';
+  // adjust catcher size based on screen
+  STATE.catcher.width = Math.max(120, Math.min(220, W * 0.18));
+  STATE.catcher.height = STATE.catcher.width*0.58;
+  // Move catcher higher on mobile
+  if (window.innerWidth < 600) {
+    STATE.catcher.y = H - 180;
+  } else {
+    STATE.catcher.y = H - 120;
+  }
+  // accelerate initial spawn to make reachable
+  STATE.lastSpawn = performance.now() - 300;
+  requestAnimationFrame(update);
+}
+
+/* End screen */
+const endScreen = document.getElementById('endScreen');
+const endTitle = document.getElementById('endTitle');
+const endSub = document.getElementById('endSub');
+const replayBtn = document.getElementById('replayBtn');
+const backIntro = document.getElementById('backIntro');
+
+function showEnd(won){
+  endScreen.style.display = 'flex';
+  if(won){
+    endTitle.textContent = 'YOU SAVED ME! Thank you Miss Banana! 🎉❤️';
+    endSub.textContent = 'You collected ' + STATE.score + ' points — the spell is broken and I\'m awake!';
+  } else {
+    endTitle.textContent = 'Oh no... I fell back asleep 😴';
+    endSub.textContent = 'You got ' + STATE.score + ' points. Try again and free me, Miss Banana!';
+  }
+}
+
+replayBtn.addEventListener('click', ()=>{
+  endScreen.style.display='none';
+  startGame();
+});
+backIntro.addEventListener('click', ()=>{
+  endScreen.style.display='none';
+  intro.style.display='flex';
+});
+
+/* make sure it's reasonably achievable: we tuned spawn rate and default catcher size.
+   At default settings catching often yields 20-40 items per minute depending on skill. */
+
+/* initial draw frame to show intro background */
+requestAnimationFrame(()=>{
+  drawBackground();
+  // draw a mock catcher preview
+  const cx = W/2, cy = H - 120;
+  drawDefaultCatcher(cx, cy, STATE.catcher.width, STATE.catcher.height);
+});
+
+/* Accessibility: click whole intro to start as asked */
+intro.addEventListener('click', (e)=>{
+  // if clicking file input, skip starting
+  if(e.target === uploaderInput || e.target.tagName === 'INPUT' || e.target.closest('.uploader')) return;
+  if(e.target === startBtn) return;
+  startGame();
+});
+
+/* small safety: if catcher image loads after start, it will be used immediately */
+</script>
+</body>
+</html>
+        <div class="subtitle">A small love-letter game — move with touch/mouse drag or A/D keys.</div>
+                
