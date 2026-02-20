@@ -155,7 +155,7 @@ const STATE = {
   goal: 350,
   startedAt: null,
   lastSpawn: 0,
-  spawnInterval: 1200, // ms (even slower spawn at start)
+  spawnInterval: 1600, // ms (slower spawn at start)
   items: [],
   speedMultiplier: 1,
   catcher: {
@@ -258,12 +258,12 @@ function spawnItem(){
     x = 40 + Math.random() * (W - 80);
   }
   // Increase falling speed for fruits and bombs
-  const timeFactor = 1 + ((Date.now() - STATE.startedAt) / 1000) / 90;
+  const timeFactor = 1 + ((Date.now() - STATE.startedAt) / 1000) / 140; // slower ramp
   let vy;
   if (types === 'banana' || types === 'coconut') {
-    vy = (1.2 + Math.random()*0.32) * timeFactor; // Faster than before
+    vy = (0.85 + Math.random()*0.22) * timeFactor; // Slower than before
   } else if (types === 'bomb') {
-    vy = (1.5 + Math.random()*0.38) * timeFactor; // Bombs fall even faster
+    vy = (1.1 + Math.random()*0.28) * timeFactor; // Bombs fall slower
   }
   const item = { type: types, x, y:-60, vy, size, rot: Math.random()*Math.PI*2, vr: (Math.random()-0.5)*0.03 };
   STATE.items.push(item);
@@ -322,10 +322,10 @@ function update(t){
   STATE.timeLeft = Math.max(0, 40 - elapsed);
   document.getElementById('timerPill').textContent = '⏳ ' + Math.ceil(STATE.timeLeft) + 's';
   // speed multiplier ramps gently to make gameplay more intense
-  STATE.speedMultiplier = 1 + Math.min(1.8, elapsed/22);
+  STATE.speedMultiplier = 1 + Math.min(1.2, elapsed/32); // slower ramp
   // spawn logic: spawn interval shrinks even more slowly for more challenge
-  const shrink = Math.max(0.7, 1 - elapsed/90); // much slower ramp, min 0.7
-  STATE.spawnInterval = 1200 * shrink; // from 1200 down to ~840ms
+  const shrink = Math.max(0.8, 1 - elapsed/120); // even slower ramp, min 0.8
+  STATE.spawnInterval = 1600 * shrink; // from 1600 down to ~1280ms
   if(t - STATE.lastSpawn > STATE.spawnInterval){
     spawnItem();
     STATE.lastSpawn = t;
@@ -333,8 +333,8 @@ function update(t){
   // update items
   for(let i=STATE.items.length-1;i>=0;i--){
     const it = STATE.items[i];
-    it.vy += 400 * dt * 0.0008 * (1 + STATE.speedMultiplier*0.3); // even slower acceleration
-    it.y += it.vy * dt * 900 * 0.36 * (1 + STATE.speedMultiplier*0.3);
+    it.vy += 400 * dt * 0.0005 * (1 + STATE.speedMultiplier*0.2); // slower acceleration
+    it.y += it.vy * dt * 900 * 0.22 * (1 + STATE.speedMultiplier*0.2); // slower falling
     it.rot += it.vr * dt * 60;
     // off bottom -> remove
     if(it.y - it.size > H + 120){ STATE.items.splice(i,1); continue; }
@@ -574,5 +574,4 @@ intro.addEventListener('click', (e)=>{
 </body>
 </html>
         <div class="subtitle">A small love-letter game — move with touch/mouse drag or A/D keys.</div>
-
                 
